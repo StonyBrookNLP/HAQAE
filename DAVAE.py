@@ -163,10 +163,16 @@ class DAVAE(nn.Module):
         return self.train(input, batch_size, dhidden, latent_values, diffs)
 
 
-    def train(self, input, batch_size, dhidden, latent_values, diffs, return_hid=False):
+    def train(self, input, batch_size, dhidden, latent_values, diffs, return_hid=False, use_eos=True):
 
         dec_outputs = []
-        for i in range(input.size(1)): #Dont need to process last since no eos
+
+        if use_eos:
+            input_size = input.size(1) + 1
+        else:
+            input_size = input.size(1) #Dont need to process last since no eos
+
+        for i in range(input_size):
             #Choose input for this step
             if i == 0:
                 tens = torch.LongTensor(input.shape[0]).zero_() + self.sos_idx
@@ -194,6 +200,13 @@ class DAVAE(nn.Module):
         outputs = []
         dec_input = Variable(torch.LongTensor(input.shape[0]).zero_() + self.sos_idx) 
         prev_output = Variable(torch.LongTensor(input.shape[0]).zero_() + self.sos_idx)
+
+        if self.decoder.input_feed is None:
+            if self.use_cuda:
+                self.decoder.init_feed_(Variable(torch.zeros(1, self.decoder.attn_dim).cuda())) #initialize the input feed 0
+            else:
+                self.decoder.init_feed_(Variable(torch.zeros(1, self.decoder.attn_dim))) 
+
         for i in range(max_len_decode):
             if i == 0: #first input is SOS (start of sentence)
                 dec_input = Variable(torch.LongTensor(input.shape[0]).zero_() + self.sos_idx)

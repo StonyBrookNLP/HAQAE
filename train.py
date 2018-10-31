@@ -112,8 +112,11 @@ def classic_train(args):
         vocab.load_vectors(pretrained)
         print("Vectors Loaded")
 
+    #Set add_eos to false if you want to decode arbitrarly long conditioned on the latents (done in paper), recommended to set this to false if generating
+    #event sequences (since length is not that important and we dont need the latents capturing it), if generating raw text its probably better to have it on
+    #In the DAVAE class there is a train() fuction that also takes in add_eos, it should match this one
     print("Loading Dataset")
-    dataset = du.SentenceDataset(args.train_data, vocab, args.src_seq_length, add_eos=False) #put in filter pred later
+    dataset = du.SentenceDataset(args.train_data, vocab, args.src_seq_length, add_eos=True) 
     print("Finished Loading Dataset {} examples".format(len(dataset)))
     batches = BatchIter(dataset, args.batch_size, sort_key=lambda x:len(x.text), train=True, sort_within_batch=True, device=-1)
     data_len = len(dataset)
@@ -166,7 +169,7 @@ def classic_train(args):
 
             # do validation
             print("Loading Validation Dataset.")
-            val_dataset = du.SentenceDataset(args.valid_data, vocab, args.src_seq_length, add_eos=False) #put in filter pred later
+            val_dataset = du.SentenceDataset(args.valid_data, vocab, args.src_seq_length, add_eos=True) 
             print("Finished Loading Validation Dataset {} examples.".format(len(val_dataset)))
             val_batches = BatchIter(val_dataset, args.batch_size, sort_key=lambda x:len(x.text), train=False, sort_within_batch=True, device=-1)
             valid_loss = 0.0

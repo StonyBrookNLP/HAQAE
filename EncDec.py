@@ -112,7 +112,7 @@ class Decoder(EncDecBase):
 
     def init_feed_(self, feed):
         """
-        Initialize the input feed (usually with the top level latent)
+        Initialize the input feed (usually with zero vector)
         Args
             feed (Tensor [batch_size, self.attn_dim)
         """
