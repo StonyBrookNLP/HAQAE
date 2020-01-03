@@ -43,7 +43,7 @@ def generate(args):
     eos_id = vocab.stoi[EOS_TOK]
     pad_id = vocab.stoi[PAD_TOK]
 
-    if args.ranking: # default is HARD one
+    if args.ranking: # default is HARD one, the 'Inverse Narrative Cloze' in the paper
         dataset = du.NarrativeClozeDataset(args.valid_data, vocab, src_seq_length=MAX_EVAL_SEQ_LEN, min_seq_length=MIN_EVAL_SEQ_LEN, LM=False)
         # Batch size during decoding is set to 1
         batches = BatchIter(dataset, 1, sort_key=lambda x:len(x.actual), train=False, device=device)
@@ -73,7 +73,7 @@ def generate(args):
 #        sample_outputs(model, vocab)
         reconstruct(args, model, batches, vocab)
 
-
+#Inverse Narrative Cloze
 def do_ranking(args, model, batches, vocab, data_len, use_cuda):
     print("RANKING")
     ranked_acc = 0.0

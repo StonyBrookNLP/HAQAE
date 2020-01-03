@@ -287,7 +287,7 @@ class LMRoleSentenceDataset(ttdata.Dataset):
 class NarrativeClozeDataset(ttdata.Dataset):
     'Data set which has a single sentence per line'
 
-    def __init__(self, path, vocab, src_seq_length=50, min_seq_length=8, easy=False, LM=True): # later pass it 
+    def __init__(self, path, vocab, src_seq_length=50, min_seq_length=8, easy=False, LM=False): # later pass it 
 
         """
         Narrative cloze ranking based on perplexity.
@@ -354,7 +354,7 @@ class NarrativeClozeDataset(ttdata.Dataset):
                         data_list.extend([dist, dist])
                     """
 
-                else: #HARD narrative cloze task
+                else: #HARD narrative cloze task, the 'Inverse Cloze Task' in the paper
                     sents = text.split(DIST_TOK)
                     assert len(sents) == 6, "Orginal + 5 distractors" 
 
