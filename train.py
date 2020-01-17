@@ -116,7 +116,7 @@ def classic_train(args):
     #event sequences (since length is not that important and we dont need the latents capturing it), if generating raw text its probably better to have it on
     #In the DAVAE class there is a train() fuction that also takes in add_eos, it should match this one
     print("Loading Dataset")
-    dataset = du.SentenceDataset(args.train_data, vocab, args.src_seq_length, add_eos=True) 
+    dataset = du.SentenceDataset(args.train_data, vocab, args.src_seq_length, add_eos=False) 
     print("Finished Loading Dataset {} examples".format(len(dataset)))
     batches = BatchIter(dataset, args.batch_size, sort_key=lambda x:len(x.text), train=True, sort_within_batch=True, device=-1)
     data_len = len(dataset)

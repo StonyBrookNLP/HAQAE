@@ -163,7 +163,7 @@ class DAVAE(nn.Module):
         return self.train(input, batch_size, dhidden, latent_values, diffs)
 
 
-    def train(self, input, batch_size, dhidden, latent_values, diffs, return_hid=False, use_eos=True):
+    def train(self, input, batch_size, dhidden, latent_values, diffs, return_hid=False, use_eos=False):
 
         dec_outputs = []
 
