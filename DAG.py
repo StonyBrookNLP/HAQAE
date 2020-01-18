@@ -220,7 +220,7 @@ class LatentNode(nn.Module):
             child.reset_values()
 
 
-def example_tree(K, all_dim, use_cuda=True):
+def example_tree(K, all_dim, use_cuda=True, nohier_mode=False):
     """
     An example function of building trees/dags to use in DAVAE
     all_dim : tuple (encoder dim, latent_dim)
@@ -230,26 +230,26 @@ def example_tree(K, all_dim, use_cuda=True):
     root_dim = (all_dim[0], all_dim[0], all_dim[1])
     dim = (all_dim[1], all_dim[0], all_dim[1])
 
-    root = LatentNode(K, root_dim, nodeid="ROOT", use_cuda=use_cuda)
+    root = LatentNode(K, root_dim, nodeid="ROOT", use_cuda=use_cuda, nohier_mode=nohier_mode)
     child_k=K
 
     #THIS WORKS FINE (Use Xavier_normal)
     print("Using Linear Chain")
     i=1
     id_str = "Level_{}".format(i)
-    child1= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda)
+    child1= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda, nohier_mode=nohier_mode)
 
     i+=1
     id_str = "Level_{}".format(i)
-    child2= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda)
+    child2= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda, nohier_mode=nohier_mode)
 
     i+=1
     id_str = "Level_{}".format(i)
-    child3= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda)
+    child3= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda, nohier_mode=nohier_mode)
 
     i+=1
     id_str = "Level_{}".format(i)
-    child4= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda)
+    child4= LatentNode(child_k, dim, nodeid=id_str, use_cuda=use_cuda, nohier_mode=nohier_mode)
 
     child3.add_child_(child4)
     child2.add_child_(child3)

@@ -127,7 +127,7 @@ def classic_train(args):
     else:
         print("Creating the Model")
         bidir_mod = 2 if args.bidir else 1
-        latents = example_tree(args.num_latent_values, (bidir_mod*args.enc_hid_size, args.latent_dim), use_cuda=use_cuda) #assume bidirectional
+        latents = example_tree(args.num_latent_values, (bidir_mod*args.enc_hid_size, args.latent_dim), use_cuda=use_cuda, nohier_mode=args.nohier) #assume bidirectional
         hidsize = (args.enc_hid_size, args.dec_hid_size)
         model = DAVAE(args.emb_size, hidsize, vocab, latents, layers=args.nlayers, use_cuda=use_cuda, pretrained=args.use_pretrained, dropout=args.dropout)
 
@@ -238,6 +238,7 @@ if __name__ == "__main__":
     parser.add_argument('-dropout', type=float, default=0.0, help='loss hyperparameters')
     parser.add_argument('--load_model', type=str)
     parser.add_argument('--load_opt', type=str)
+    parser.add_argument('--nohier', action='store_true', help='use the nohier model instead')
     
     args = parser.parse_args()
 
