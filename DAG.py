@@ -13,13 +13,14 @@ import torch.nn.functional as F
 
 class LatentNode(nn.Module):
     'a node in the latent dag graph, represents a latent variable'
-    def __init__(self, K, dim, nodeid="0", embeddings=None, use_attn=True, use_cuda=True):
+    def __init__(self, K, dim, nodeid="0", embeddings=None, use_attn=True, use_cuda=True, nohier_mode=False):
         """
         Args
             K (int) : number of latent categorical values this can take on (and thus, the # of embeddings)
             dim (int tuple) :  (query dimension, encoder input (memory) dimension, latent embedding dimension (output))
             nodeid (str) : an optional id for naming the node
             embeddings (nn.Embeddings) : Pass these if you want to create the embeddings, else just go with default
+            nohier_mode (bool) : Run the NOHIER model instead
         """
         super(LatentNode, self).__init__()
         self.children = []  #list of LatentNodes
@@ -28,6 +29,7 @@ class LatentNode(nn.Module):
         self.value = None 
         self.diffs = None
         self.index_value = None #Index is the indices into the embedding of the above
+        self.nohier = nohier_mode
 
         #print("use_cuda is {}".format(use_cuda))
         
@@ -111,7 +113,7 @@ class LatentNode(nn.Module):
         """
         #For now assume a tree structure, with only one parent
 
-        if not self.isroot(): 
+        if not self.isroot() and not self.nohier:  #if we are a child node AND we are not running in nohier mode
 
             prev_latent = self.parents[0].value #propogate decoder loss back through attn and any previous attns
 
@@ -120,7 +122,7 @@ class LatentNode(nn.Module):
             V2, scores2 = self.attn(self.parents[0].embeddings.weight[self.parents[0].argmins], input_memory.detach(), input_lens) 
 
         else:
-            V, scores = self.attn(init_query, input_memory, input_lens) #This seems to work best
+            V, scores = self.attn(init_query, input_memory, input_lens) 
 
         batch_size = V.shape[0]
 
@@ -138,7 +140,7 @@ class LatentNode(nn.Module):
 #        print(self.argmins[0])
 
 
-        if self.isroot():
+        if self.isroot() or self.nohier:
 
             self.value = W[self.argmins].detach() + V - V.detach() #This is the straight through estimator (Confirmed that this works)
 
