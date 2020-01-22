@@ -42,7 +42,10 @@ def monolithic_compute_loss(iteration, model, target, target_lens, latent_values
     #sum together means
     reconstruct= torch.cat([x[1].unsqueeze(dim=0) for x in diff], dim=0)
     commit = torch.cat([x[0].unsqueeze(dim=0) for x in diff], dim=0)
-    commit2 = torch.cat([x[2].unsqueeze(dim=0) for x in diff[1:]], dim=0)
+    if not args.nohier:
+        commit2 = torch.cat([x[2].unsqueeze(dim=0) for x in diff[1:]], dim=0)
+    else:
+        commit2 = torch.zeros(1) if not use_cuda else torch.zeros([0]).cuda()
 
     # logits is [seq_len * batch_size * vocab_size]
     logits = model.logits_out(dec_outputs) 

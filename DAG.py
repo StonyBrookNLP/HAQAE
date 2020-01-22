@@ -228,10 +228,16 @@ def example_tree(K, all_dim, use_cuda=True, nohier_mode=False):
 
                 #Query dim  #Mem Dim   #Latent Dim
     root_dim = (all_dim[0], all_dim[0], all_dim[1])
-    dim = (all_dim[1], all_dim[0], all_dim[1])
+    if nohier_mode:
+        dim = root_dim
+    else:
+        dim = (all_dim[1], all_dim[0], all_dim[1])
 
     root = LatentNode(K, root_dim, nodeid="ROOT", use_cuda=use_cuda, nohier_mode=nohier_mode)
     child_k=K
+
+    if nohier_mode:
+        print("Using NOHIER")
 
     #THIS WORKS FINE (Use Xavier_normal)
     print("Using Linear Chain")
