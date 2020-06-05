@@ -172,7 +172,7 @@ def classic_train(args):
 
             # do validation
             print("Loading Validation Dataset.")
-            val_dataset = du.SentenceDataset(args.valid_data, vocab, args.src_seq_length, add_eos=True) 
+            val_dataset = du.SentenceDataset(args.valid_data, vocab, args.src_seq_length, add_eos=False) 
             print("Finished Loading Validation Dataset {} examples.".format(len(val_dataset)))
             val_batches = BatchIter(val_dataset, args.batch_size, sort_key=lambda x:len(x.text), train=False, sort_within_batch=True, device=-1)
             valid_loss = 0.0
