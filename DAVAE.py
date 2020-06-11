@@ -135,7 +135,10 @@ class DAVAE(nn.Module):
         dhidden = torch.nn.functional.tanh(self.latent_in(top_level).view(self.layers, batch_size, self.dec_hsize))
 
         if encode_only:
-            self.decoder.init_feed_(Variable(torch.zeros(batch_size, self.decoder.attn_dim)))
+            if self.use_cuda:
+                self.decoder.init_feed_(Variable(torch.zeros(batch_size, self.decoder.attn_dim)).cuda())
+            else:
+                self.decoder.init_feed_(Variable(torch.zeros(batch_size, self.decoder.attn_dim)))
             return dhidden, latent_values
 
         #Decode output one step at a time

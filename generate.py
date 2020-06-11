@@ -46,24 +46,30 @@ def generate(args):
     if args.ranking: # default is HARD one, the 'Inverse Narrative Cloze' in the paper
         dataset = du.NarrativeClozeDataset(args.valid_data, vocab, src_seq_length=MAX_EVAL_SEQ_LEN, min_seq_length=MIN_EVAL_SEQ_LEN, LM=False)
         # Batch size during decoding is set to 1
-        batches = BatchIter(dataset, 1, sort_key=lambda x:len(x.actual), train=False, device=device)
+        batches = BatchIter(dataset, 1, sort_key=lambda x:len(x.actual), train=False, device=-1)
     else:
         dataset = du.SentenceDataset(args.valid_data, vocab, src_seq_length=MAX_EVAL_SEQ_LEN, min_seq_length=MIN_EVAL_SEQ_LEN, add_eos=False) #put in filter pred later
         # Batch size during decoding is set to 1
-        batches = BatchIter(dataset, 1, sort_key=lambda x:len(x.text), train=False, device=device)
+        batches = BatchIter(dataset, args.batch_size, sort_key=lambda x:len(x.text), train=False, device=-1)
 
     data_len = len(dataset)
 
     #Create the model
     with open(args.load, 'rb') as fi:
-        model = torch.load(fi, map_location=lambda storage, loc : storage)
+        if not use_cuda:
+            model = torch.load(fi, map_location=lambda storage, loc : storage)
+        else:
+            model = torch.load(fi, map_location=torch.device('cuda'))
+
+    if not hasattr(model.latent_root, 'nohier'):
+        model.latent_root.set_nohier(args.nohier) #for backwards compatibility
 
     model.decoder.eval()
-    model.set_use_cuda(False)
+    model.set_use_cuda(use_cuda)
 
     #For reconstruction
     if args.perplexity:
-        loss = calc_perplexity(args, model, batches, vocab, data_len)
+        loss = calc_perplexity2(args, model, batches, vocab, data_len)
         print("Loss = {}".format(loss))
     elif args.schema:
         generate_from_seed(args, model, batches, vocab, data_len)
@@ -91,12 +97,9 @@ def do_ranking(args, model, batches, vocab, data_len, use_cuda):
         assert len(all_texts) == 12, "12 = 6 * 2."
 
         all_texts_vars = []
-        if use_cuda:    
-            for tup in all_texts:
-                all_texts_vars.append((Variable(tup[0].cuda(), volatile=True), tup[1]))
-        else:
-            for tup in all_texts:
-                all_texts_vars.append((Variable(tup[0], volatile=True), tup[1]))
+       
+        for tup in all_texts:
+            all_texts_vars.append((Variable(tup[0], volatile=True), tup[1]))
 
         # will itetrate 2 at a time using iterator and next
         vars_iter = iter(all_texts_vars)
@@ -113,22 +116,33 @@ def do_ranking(args, model, batches, vocab, data_len, use_cuda):
         src_tup = Variable(bl.actual[0][:, :first_tup+1].view(1, -1), volatile=True)
         src_lens = torch.LongTensor([src_tup.shape[1]])
 
+        if use_cuda:
+            src_tup = src_tup.cuda()
+            src_lens = src_lens.cuda()
+
         dhidden, latent_values = model(src_tup, src_lens, encode_only=True)
         
         # Latent and hidden have been initialized with the first tuple
         for tup in vars_iter:
             ## INIT FEED AND DECODE before every sentence. 
-            model.decoder.init_feed_(Variable(torch.zeros(1, model.decoder.attn_dim)))
+            if use_cuda:
+                model.decoder.init_feed_(Variable(torch.zeros(1, model.decoder.attn_dim).cuda()))
+            else:
+                model.decoder.init_feed_(Variable(torch.zeros(1, model.decoder.attn_dim)))
 
             next_tup = next(vars_iter)
-            _, _, _, dec_outputs  = model.train(tup[0], 1, dhidden, latent_values, []) 
-            logits = model.logits_out(dec_outputs)
+            if use_cuda:
+                _, _, _, dec_outputs  = model.train(tup[0].cuda(), 1, dhidden, latent_values, []) 
+            else:
+                _, _, _, dec_outputs  = model.train(tup[0], 1, dhidden, latent_values, []) 
+
+            logits = model.logits_out(dec_outputs).cpu()
             logits = logits.transpose(0,1).contiguous() # convert to [batch, seq, vocab]
             nll = masked_cross_entropy(logits, next_tup[0], Variable(next_tup[1]))
             #nll = calc_perplexity(args, model, tup[0], vocab, next_tup[0], next_tup[1], hidden) 
             pp = torch.exp(nll)
             #print("NEG-LOSS {} PPL {}".format(nll.data[0], pp.data[0]))
-            pps.append(pp.data.numpy()[0])
+            pps.append(pp.data.numpy())
 
         # low perplexity == top ranked sentence- correct answer is the first one of course
         assert len(pps) == 6, "6 targets."
@@ -164,10 +178,11 @@ def calc_perplexity(args, model, batches, vocab, data_len):
             batch = Variable(batch.cuda(), volatile=True)
         else:
             batch = Variable(batch, volatile=True)
-
+        
         _, _, _, dec_outputs  = model(batch, batch_lens)
 
-        logits = model.logits_out(dec_outputs) 
+        logits = model.logits_out(dec_outputs).cpu() 
+
         logits = logits.transpose(0,1).contiguous() # convert to [batch, seq, vocab]
 
         ce_loss = masked_cross_entropy(logits, Variable(target), Variable(target_lens))
@@ -179,6 +194,36 @@ def calc_perplexity(args, model, batches, vocab, data_len):
     print(data_len)
 
     return total_loss / data_len
+
+def calc_perplexity2(args, model, batches, vocab, data_len):
+    total_loss = 0.0
+    iters = 0
+    total_words = 0
+    for iteration, bl in enumerate(batches):
+        print(iteration)
+        batch, batch_lens = bl.text
+        target, target_lens = bl.target
+        if args.cuda:
+            batch = Variable(batch.cuda(), volatile=True)
+        else:
+            batch = Variable(batch, volatile=True)
+
+        _, _, _, dec_outputs  = model(batch, batch_lens)
+
+        logits = model.logits_out(dec_outputs).cpu() 
+        logits = logits.transpose(0,1).contiguous() # convert to [batch, seq, vocab]
+
+        ce_loss = masked_cross_entropy(logits, Variable(target), Variable(target_lens))
+        total_loss = total_loss + ce_loss.data[0]*target_lens.float().sum()
+
+        total_words += target_lens.sum()
+
+        iters += 1
+
+    print(iters)
+    print(data_len)
+
+    return total_loss / total_words.float()
 
 
 def sample_outputs(model, vocab): 
@@ -309,27 +354,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DAVAE')
     parser.add_argument('--impute_with', type=int, default=0)
     parser.add_argument('--valid_data', type=str)
-    parser.add_argument('--min_vocab_freq', type=int, default=1)
     parser.add_argument('--vocab', type=str) 
-    parser.add_argument('--emb_size', type=int, default=200, help='size of word embeddings')
-    parser.add_argument('--hid_size', type=int, default=200,help='size of hidden')
-    parser.add_argument('--nlayers', type=int, default=2, help='number of layers')
-    parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')
-    parser.add_argument('--log_after', type=int, default=200)
-    parser.add_argument('--save_after', type=int, default=500)
-    parser.add_argument('--validate_after', type=int, default=2500)
-    parser.add_argument('--optimizer', type=str, default='adagrad', help='adam, adagrad, sgd')
-    parser.add_argument('--clip', type=float, default=0.25, help='gradient clipping')
-    parser.add_argument('--epochs', type=int, default=40, help='upper epoch limit')
     parser.add_argument('--batch_size', type=int, default=1, metavar='N', help='batch size')
     parser.add_argument('--seed', type=int, default=11, help='random seed')
     parser.add_argument('--cuda', action='store_true', help='use CUDA')
     parser.add_argument('--load', type=str,  default='model.pt',help='path to load the final model')
-    parser.add_argument('--bidir', type=bool, default=True, help='Use bidirectional encoder')
     parser.add_argument('--latent', type=str, help='A str in form of python list')
     parser.add_argument('--beam_size',  type=int, default=-1, help='Beam size')
     parser.add_argument('-perplexity',  action='store_true')
     parser.add_argument('-schema',  action='store_true')
+    parser.add_argument('-nohier',  action='store_true')
     parser.add_argument('-max_len_decode', type=int, default=50, help='Maximum prediction length.')
     parser.add_argument('--n_best', type=int, default=1, help="""outputs the n_best decoded sentences""")
     parser.add_argument('--ranking',  action='store_true', help="""N cloze ranking""")

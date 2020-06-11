@@ -219,6 +219,15 @@ class LatentNode(nn.Module):
         for child in self.children:
             child.reset_values()
 
+    def set_nohier(self, value=False):
+        """
+        Set nohier attribute to false for this node and all children.
+        This is for backwards compatibility with older versions
+        """
+        self.nohier = value
+        for child in self.children:
+            child.set_nohier(value)
+
 
 def example_tree(K, all_dim, use_cuda=True, nohier_mode=False):
     """
