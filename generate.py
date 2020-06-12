@@ -69,7 +69,7 @@ def generate(args):
 
     #For reconstruction
     if args.perplexity:
-        loss = calc_perplexity2(args, model, batches, vocab, data_len)
+        loss = calc_perplexity(args, model, batches, vocab, data_len)
         print("Loss = {}".format(loss))
     elif args.schema:
         generate_from_seed(args, model, batches, vocab, data_len)
@@ -167,7 +167,7 @@ def do_ranking(args, model, batches, vocab, data_len, use_cuda):
     print("Average acc(%): {}".format(ranked_acc))
 
 
-def calc_perplexity(args, model, batches, vocab, data_len):
+def calc_perplexity_avg_line(args, model, batches, vocab, data_len):
     total_loss = 0.0
     iters = 0
     for iteration, bl in enumerate(batches):
@@ -195,7 +195,7 @@ def calc_perplexity(args, model, batches, vocab, data_len):
 
     return total_loss / data_len
 
-def calc_perplexity2(args, model, batches, vocab, data_len):
+def calc_perplexity(args, model, batches, vocab, data_len):
     total_loss = 0.0
     iters = 0
     total_words = 0

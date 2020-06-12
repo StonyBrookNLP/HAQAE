@@ -309,7 +309,7 @@ def gen_from_seed(model, vocab, eos_id, pad_id, sos_id, tup_id):
 
    
 
-def get_perplexity(model, vocab):    
+def get_perplexity_avg_line(model, vocab):    
     total_loss = 0.0
     if args.emb_type: # GET PERPLEXITY WITH ROLE EMB
         print("PERPLEXITY WITH ROLE EMB")
@@ -388,6 +388,90 @@ def get_perplexity(model, vocab):
         print("Average Loss: {}".format(loss))
         return loss 
 
+
+def get_perplexity(model, vocab):    
+    total_loss = 0.0
+    total_words = 0
+    if args.emb_type: # GET PERPLEXITY WITH ROLE EMB
+        print("PERPLEXITY WITH ROLE EMB")
+        vocab2 = du.load_vocab(args.vocab2)
+        dataset = du.LMRoleSentenceDataset(args.data, vocab, args.role_data, vocab2, src_seq_length=MAX_EVAL_SEQ_LEN, min_seq_length=MIN_EVAL_SEQ_LEN) #put in filter pred later
+        batches = BatchIter(dataset, args.batch_size, sort_key=lambda x:len(x.text), train=False, device=device) 
+
+        print("DATASET {}".format(len(dataset)))
+        for iteration, bl in enumerate(batches):
+            
+            if (iteration+1)%25 == 0:
+                print("iteration {}".format(iteration+1))
+                
+            ## DATA STEPS 
+            batch, batch_lens = bl.text
+            target, target_lens = bl.target         
+            role, role_lens = bl.role
+
+            if use_cuda: 
+                batch = Variable(batch.cuda(), volatile=True) 
+                target = Variable(target.cuda(), volatile=True)
+                role = Variable(role.cuda(), volatile=True)
+            else: 
+                batch = Variable(batch, volatile=True) 
+                target = Variable(target, volatile=True)
+                role = Variable(role, volatile=True)
+                 
+            ## INIT AND DECODE
+            hidden = model.init_hidden(args.batch_size)                  
+            ce_loss = calc_perplexity(args, model, batch, vocab, target, target_lens, hidden, role)
+            #print("Loss {}".format(ce_loss))
+            total_loss = total_loss + ce_loss.data[0]*target_lens.float().sum()
+
+            total_words += target_lens.sum()
+            
+            if (iteration+1) == args.max_decode:
+                print("Max decode reached. Exiting.")
+                break
+
+        # after iterating over all examples 
+        loss = total_loss / total_words.float()
+        print("Average Loss: {}".format(loss))
+        return loss
+
+    else: 
+        print("PERPLEXITY WITHOUT ROLE EMB")
+        dataset = du.LMSentenceDataset(args.data, vocab, src_seq_length=MAX_EVAL_SEQ_LEN, min_seq_length=MIN_EVAL_SEQ_LEN) #put in filter pred later
+        batches = BatchIter(dataset, args.batch_size, sort_key=lambda x:len(x.text), train=False, device=device)
+        for iteration, bl in enumerate(batches):
+         
+            if (iteration+1)%25 == 0:
+                print("iteration {}".format(iteration+1))
+            
+            ## DATA STEPS 
+            batch, batch_lens = bl.text
+            target, target_lens = bl.target         
+     
+            if use_cuda: 
+                batch = Variable(batch.cuda(), volatile=True) 
+                target = Variable(target, volatile=True) 
+            else: 
+                batch = Variable(batch, volatile=True) 
+                target = Variable(target, volatile=True)
+                  
+            ## INIT AND DECODE
+            hidden = model.init_hidden(args.batch_size)  
+            ce_loss = calc_perplexity(args, model, batch, vocab, target, target_lens, hidden)
+            #print("Loss {}".format(ce_loss))
+            total_loss = total_loss + ce_loss.data[0]*target_lens.float().sum()
+
+            total_words += target_lens.sum()
+
+            if (iteration+1) == args.max_decode:
+                print("Max decode reached. Exiting.")
+                break
+
+
+        # after iterating over all examples 
+        loss = total_loss / total_words.float()
+        print("Average Loss: {}".format(loss))
+        return loss 
 
 
 def calc_perplexity(args, model, batch, vocab, target, target_lens, hidden, role=None):
@@ -556,7 +640,7 @@ if __name__ == "__main__":
     parser.add_argument('--ranking', action='store_true', help="""narrative cloze ranking""") 
     parser.add_argument('--seed', action='store_true', help="""seed based testing""")
     # max decoded
-    parser.add_argument('--max_decode', type=int, default=2000, help="""max sentences to be evaluated/decoded.""") 
+    parser.add_argument('--max_decode', type=int, default=1000000, help="""max sentences to be evaluated/decoded.""") 
     # role data related
     parser.add_argument('--emb_type', action='store_true')
     parser.add_argument('--role_data', type=str, help='location of the role data corpus')
